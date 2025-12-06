@@ -1,15 +1,17 @@
 package audio
 
 import (
+	"sync"
 	"unsafe"
 
 	"github.com/gen2brain/malgo"
 )
 
 type AudioInput struct {
-	ctx    *malgo.AllocatedContext
-	device *malgo.Device
-	Frames chan []float32
+	ctx      *malgo.AllocatedContext
+	device   *malgo.Device
+	Frames   chan []float32
+	stopOnce sync.Once
 }
 
 func NewAudioInput(sampleRate uint32) (*AudioInput, error) {
@@ -55,8 +57,10 @@ func (ai *AudioInput) Start() error {
 }
 
 func (ai *AudioInput) Stop() {
-	ai.device.Stop()
-	ai.device.Uninit()
-	ai.ctx.Uninit()
-	close(ai.Frames)
+	ai.stopOnce.Do(func() {
+		ai.device.Stop()
+		ai.device.Uninit()
+		ai.ctx.Uninit()
+		close(ai.Frames)
+	})
 }
