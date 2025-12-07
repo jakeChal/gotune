@@ -16,12 +16,12 @@ type GoldenTestCase struct {
 }
 
 type GoldenTestData struct {
-	Version     string            `json:"version"`
-	Description string            `json:"description"`
-	TestCases   []GoldenTestCase  `json:"test_cases"`
+	Version     string           `json:"version"`
+	Description string           `json:"description"`
+	TestCases   []GoldenTestCase `json:"test_cases"`
 }
 
-func TestNormalizedSquareDifference_Golden(t *testing.T) {
+func TestNormalizedSquareDifference_WithPython(t *testing.T) {
 	// Load golden test data
 	data, err := os.ReadFile("../../python/testdata/nsdf_golden.json")
 	if err != nil {
@@ -80,9 +80,33 @@ func TestNormalizedSquareDifference_Golden(t *testing.T) {
 	}
 }
 
-func TestAutocorrelation(t *testing.T) {
-	signal := GenerateSineWave(440, 1, 48000)
+func TestPeakPicking(t *testing.T) {
+	// Create synthetic NSDF with known peaks
+	nsdf := make([]float64, 1000)
+	nsdf[100] = 0.8
+	nsdf[500] = 0.9
 
-	nsdf := NormalizedSquareDifference(signal)
-	_ = nsdf
+	peaks := PeakPicking(nsdf, 0.5)
+
+	if len(peaks) != 2 {
+		t.Errorf("Expected 2 peaks, got %d", len(peaks))
+	}
+}
+
+func TestDetectPitch_A440(t *testing.T) {
+	sampleRate := 48000
+	freq := 440.0
+	duration := 0.1
+	thresh := 0.1
+	signal := GenerateSineWave(freq, duration, sampleRate)
+
+	result := DetectPitch(signal, sampleRate, thresh)
+
+	if !result.HasPitch {
+		t.Fatal("Expected pitch to be detected")
+	}
+
+	if AlmostEqual(result.Frequency, freq, 1.0) {
+		t.Errorf("Expected ~440 Hz, got %f", result.Frequency)
+	}
 }

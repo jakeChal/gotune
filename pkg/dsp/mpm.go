@@ -71,7 +71,7 @@ func NormalizedSquareDifference(buffer []float64) []float64 {
 // 1. The value is positive
 // 2. The value exceeds the threshold
 // 3. The value is greater than its neighbors (local maximum)
-func peakPicking(nsdf []float64, threshold float64) []peak {
+func PeakPicking(nsdf []float64, threshold float64) []peak {
 	var peaks []peak
 
 	// Start from lag=1 to avoid the trivial peak at lag=0
@@ -165,7 +165,7 @@ func DetectPitch(buffer []float64, sampleRate int, threshold float64) PitchResul
 	nsdf := NormalizedSquareDifference(buffer)
 
 	// Step 2: Find peaks above threshold
-	peaks := peakPicking(nsdf, threshold)
+	peaks := PeakPicking(nsdf, threshold)
 
 	if len(peaks) == 0 {
 		return PitchResult{Frequency: 0, Clarity: 0, HasPitch: false}
