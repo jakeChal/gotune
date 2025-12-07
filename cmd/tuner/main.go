@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"gitlab.com/jacobidis/gotune/pkg/audio"
-	"gitlab.com/jacobidis/gotune/pkg/config"
-	"gitlab.com/jacobidis/gotune/pkg/dsp"
+	"github.com/jakeChal/gotune/pkg/audio"
+	"github.com/jakeChal/gotune/pkg/config"
+	"github.com/jakeChal/gotune/pkg/dsp"
 )
 
 const (

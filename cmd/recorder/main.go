@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"gitlab.com/jacobidis/gotune/pkg/audio"
+	"github.com/jakeChal/gotune/pkg/audio"
 )
 
 func main() {
