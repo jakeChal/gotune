@@ -6,21 +6,30 @@ import (
 	"os"
 
 	"gitlab.com/jacobidis/gotune/pkg/audio"
+	"gitlab.com/jacobidis/gotune/pkg/config"
 	"gitlab.com/jacobidis/gotune/pkg/dsp"
 )
 
 const (
 	sampleRate = 48000
 	bufferSize = 4096
-
-	// Guitar specific
-	minFreq = 75.0   // Slightly below E2 (82.4 Hz)
-	maxFreq = 1400.0 // Slightly above E6 (1318 Hz)
 )
 
 func main() {
-	threshold := flag.Float64("t", 0.1, "The MPM algorithm's detection threshold [0 - 1.0]. Low values can lead to false positives")
+	threshold := flag.Float64("t", 0.1, "The MPM algorithm's detection threshold [0 - 1.0]. Low values increase the sensitivity.")
+	instrumentName := flag.String("i", "guitar", "Instrument profile (guitar, bouzouki).")
 	flag.Parse()
+
+	profile, ok := config.GetProfile(*instrumentName)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "Unknown instrument: %s\n", *instrumentName)
+		fmt.Fprintf(os.Stderr, "Supported instruments: %v\n", config.ListInstruments())
+		os.Exit(1)
+	}
+
+	fmt.Printf("Tuning for: %s (%.0f-%.0f Hz)\n",
+		profile.Name, profile.MinFreq, profile.MaxFreq)
+
 	if *threshold < 0 || *threshold > 1.0 {
 		fmt.Fprintf(os.Stderr, "threshold: %v is out of range!\n", *threshold)
 		os.Exit(1)
@@ -48,7 +57,7 @@ func main() {
 			result := dsp.DetectPitch(bufferAccum[:bufferSize], sampleRate, *threshold)
 
 			// display
-			if result.HasPitch && result.Frequency >= minFreq && result.Frequency <= maxFreq {
+			if result.HasPitch && result.Frequency >= profile.MinFreq && result.Frequency <= profile.MaxFreq {
 				noteName, _, centsOff := dsp.PitchToNote(result.Frequency)
 				fmt.Printf(
 					"\rFrequency detected: %9.2f | %-4s %4d cents [confidence: %5.2f]",
