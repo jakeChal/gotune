@@ -11,8 +11,10 @@ import (
 )
 
 const (
-	sampleRate = 48000
-	bufferSize = 4096
+	sampleRate        = 48000
+	bufferSize        = 4096
+	silenceThreshold  = 0.001
+	minDisplayClarity = 0.3
 )
 
 func main() {
@@ -45,8 +47,6 @@ func main() {
 	}
 	defer ai.Stop()
 
-	fmt.Println("Listening...")
-
 	bufferAccum := make([]float64, 0, bufferSize)
 
 	for frame := range ai.Frames {
@@ -54,10 +54,20 @@ func main() {
 		bufferAccum = append(bufferAccum, frame64...)
 
 		if len(bufferAccum) >= bufferSize {
+			energy := dsp.CalculateRMS(bufferAccum[:bufferSize])
+			if energy < silenceThreshold {
+				fmt.Printf("\rListening...%-60s", "")
+				bufferAccum = bufferAccum[:0]
+				continue
+			}
+
 			result := dsp.DetectPitch(bufferAccum[:bufferSize], sampleRate, *threshold)
 
 			// display
-			if result.HasPitch && result.Frequency >= profile.MinFreq && result.Frequency <= profile.MaxFreq {
+			if result.HasPitch &&
+				result.Clarity >= minDisplayClarity &&
+				result.Frequency >= profile.MinFreq &&
+				result.Frequency <= profile.MaxFreq {
 				noteName, _, centsOff := dsp.PitchToNote(result.Frequency)
 				fmt.Printf(
 					"\rFrequency detected: %9.2f | %-4s %4d cents [confidence: %5.2f]",
