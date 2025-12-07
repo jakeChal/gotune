@@ -17,6 +17,62 @@ const (
 	minDisplayClarity = 0.3
 )
 
+func formatTuningDisplay(freq float64, noteName string, cents float64) string {
+	// Visual meter: [<<<|>>>] where | is perfect
+	meter := makeMeter(cents)
+	status := tuningStatus(cents)
+	return fmt.Sprintf("\r%-4s %s %s | %7.2f Hz", noteName, meter, status, freq)
+}
+
+func makeMeter(cents float64) string {
+	// cents: -50 to +50 range
+	// Display: [<<<<|>>>>]
+	if cents < -20 {
+		return "[<<<<|    ]"
+	}
+	if cents < -10 {
+		return "[ <<<|    ]"
+	}
+	if cents < -5 {
+		return "[  <<|    ]"
+	}
+	if cents < -2 {
+		return "[   <|    ]"
+	}
+	if cents <= 2 {
+		return "[    |    ]" // In tune!
+	}
+	if cents <= 5 {
+		return "[    |>   ]"
+	}
+	if cents <= 10 {
+		return "[    |>>  ]"
+	}
+	if cents <= 20 {
+		return "[    |>>> ]"
+	}
+	return "[    |>>>>]"
+}
+
+func tuningStatus(cents float64) string {
+	absCents := cents
+	if absCents < 0 {
+		absCents = -absCents
+	}
+
+	if absCents <= 2 {
+		return "✓ IN TUNE"
+	} else if absCents <= 5 {
+		return "~ close  "
+	} else if absCents <= 10 {
+		return "  adjust "
+	} else if cents < 0 {
+		return "  too low"
+	} else {
+		return "  too high"
+	}
+}
+
 func main() {
 	threshold := flag.Float64("t", 0.1, "The MPM algorithm's detection threshold [0 - 1.0]. Low values increase the sensitivity.")
 	instrumentName := flag.String("i", "guitar", "Instrument profile (guitar, bouzouki).")
@@ -57,7 +113,8 @@ func main() {
 			energy := dsp.CalculateRMS(bufferAccum[:bufferSize])
 			if energy < silenceThreshold {
 				fmt.Printf("\rListening...%-60s", "")
-				bufferAccum = bufferAccum[:0]
+				// Keep overflow samples for better continuity
+				bufferAccum = bufferAccum[bufferSize:]
 				continue
 			}
 
@@ -69,13 +126,11 @@ func main() {
 				result.Frequency >= profile.MinFreq &&
 				result.Frequency <= profile.MaxFreq {
 				noteName, _, centsOff := dsp.PitchToNote(result.Frequency)
-				fmt.Printf(
-					"\rFrequency detected: %9.2f | %-4s %4d cents [confidence: %5.2f]",
-					result.Frequency, noteName, int(centsOff), result.Clarity,
-				)
+				fmt.Print(formatTuningDisplay(result.Frequency, noteName, centsOff))
 			}
-			// reset
-			bufferAccum = bufferAccum[:0]
+			// Keep overflow samples for better continuity
+			bufferAccum = bufferAccum[bufferSize:]
+
 		}
 	}
 }
