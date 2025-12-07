@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "description": "Golden test data for NSDF validation",
+  "description": "Golden test data for NSDF validation (via generate_test_data.py)",
   "test_cases": [
     {
       "name": "440Hz sine wave",

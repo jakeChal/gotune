@@ -171,11 +171,19 @@ func DetectPitch(buffer []float64, sampleRate int, threshold float64) PitchResul
 		return PitchResult{Frequency: 0, Clarity: 0, HasPitch: false}
 	}
 
-	// Step 3: Select the highest peak (maximum clarity)
+	// Step 3: Select the best peak
+	// For musical signals, the first peak (lowest lag) with high clarity
+	// is usually the fundamental frequency. Harmonics appear at higher lags.
 	bestPeak := peaks[0]
-	for _, p := range peaks[1:] {
-		if p.value > bestPeak.value {
-			bestPeak = p
+
+	// If first peak has strong clarity, use it (fundamental frequency)
+	// Otherwise, find the peak with maximum clarity
+	const strongClarityThreshold = 0.8
+	if peaks[0].value < strongClarityThreshold {
+		for _, p := range peaks[1:] {
+			if p.value > bestPeak.value {
+				bestPeak = p
+			}
 		}
 	}
 

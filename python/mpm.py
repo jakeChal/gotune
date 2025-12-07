@@ -174,8 +174,19 @@ def mpm_pitch_detection(audio_buffer, sample_rate, threshold=0.1):
     if not peaks:
         return None, None
 
-    # Step 3: Select the highest peak (maximum clarity)
-    best_peak = max(peaks, key=lambda p: p[1])
+    # Step 3: Select the best peak
+    # For musical signals, the first peak (lowest lag) with high clarity
+    # is usually the fundamental frequency. Harmonics appear at higher lags.
+    first_peak_index, first_peak_clarity = peaks[0]
+
+    # If first peak has strong clarity, use it (fundamental frequency)
+    # Otherwise, find the peak with maximum clarity
+    strong_clarity_threshold = 0.8
+    if first_peak_clarity >= strong_clarity_threshold:
+        best_peak = peaks[0]
+    else:
+        best_peak = max(peaks, key=lambda p: p[1])
+
     peak_index, clarity = best_peak
 
     # Step 4: Refine peak location with parabolic interpolation

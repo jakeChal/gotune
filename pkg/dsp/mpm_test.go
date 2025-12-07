@@ -96,7 +96,7 @@ func TestPeakPicking(t *testing.T) {
 func TestDetectPitch_A440(t *testing.T) {
 	sampleRate := 48000
 	freq := 440.0
-	duration := 0.1
+	duration := 0.5
 	thresh := 0.1
 	signal := GenerateSineWave(freq, duration, sampleRate)
 
@@ -106,7 +106,7 @@ func TestDetectPitch_A440(t *testing.T) {
 		t.Fatal("Expected pitch to be detected")
 	}
 
-	if AlmostEqual(result.Frequency, freq, 1.0) {
-		t.Errorf("Expected ~440 Hz, got %f", result.Frequency)
+	if !AlmostEqual(result.Frequency, freq, 1.0) {
+		t.Errorf("Expected %.3f Hz, got %.3f", freq, result.Frequency)
 	}
 }
