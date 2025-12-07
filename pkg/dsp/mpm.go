@@ -7,6 +7,17 @@ import (
 	"gonum.org/v1/gonum/dsp/fourier"
 )
 
+// Peak represents a detected peak in the NSDF.
+type peak struct {
+	index int     // Lag index (tau)
+	value float64 // NSDF value at this lag
+}
+type PitchResult struct {
+	Frequency float64 // Detected frequency in Hz (0 if no pitch found)
+	Clarity   float64 // Confidence score (0.0 to 1.0)
+	HasPitch  bool    // Whether a valid pitch was detected
+}
+
 // Calculate the Normalized Square Difference Function (NSDF).
 // The NSDF is similar to autocorrelation but normalized to account
 // for varying signal energy at different lags.
@@ -54,19 +65,14 @@ func NormalizedSquareDifference(buffer []float64) []float64 {
 	return nsdf
 }
 
-// Peak represents a detected peak in the NSDF.
-type Peak struct {
-	Index int     // Lag index (tau)
-	Value float64 // NSDF value at this lag
-}
-
-// PeakPicking finds positive peaks in the NSDF that exceed the threshold.
+// Find positive peaks in the NSDF that exceed the threshold.
+//
 // A peak is defined as a point where:
 // 1. The value is positive
 // 2. The value exceeds the threshold
 // 3. The value is greater than its neighbors (local maximum)
-func PeakPicking(nsdf []float64, threshold float64) []Peak {
-	var peaks []Peak
+func peakPicking(nsdf []float64, threshold float64) []peak {
+	var peaks []peak
 
 	// Start from lag=1 to avoid the trivial peak at lag=0
 	for i := 1; i < len(nsdf)-1; i++ {
@@ -74,12 +80,34 @@ func PeakPicking(nsdf []float64, threshold float64) []Peak {
 		if nsdf[i] > threshold && nsdf[i] > 0 {
 			// Check if it's a local maximum
 			if nsdf[i] > nsdf[i-1] && nsdf[i] > nsdf[i+1] {
-				peaks = append(peaks, Peak{Index: i, Value: nsdf[i]})
+				peaks = append(peaks, peak{index: i, value: nsdf[i]})
 			}
 		}
 	}
 
 	return peaks
+}
+
+// Use parabolic interpolation to refine the peak location.
+//
+// This improves frequency resolution by fitting a parabola through
+// the peak and its neighbors to find the true maximum.
+func parabolicInterpolation(nsdf []float64, peakIndex int) float64 {
+	if peakIndex <= 0 || peakIndex >= len(nsdf)-1 {
+		return float64(peakIndex)
+	}
+
+	alpha := nsdf[peakIndex-1]
+	beta := nsdf[peakIndex]
+	gamma := nsdf[peakIndex+1]
+
+	denominator := alpha - 2*beta + gamma
+	if math.Abs(denominator) < 1e-10 {
+		return float64(peakIndex)
+	}
+
+	offset := 0.5 * (alpha - gamma) / denominator
+	return float64(peakIndex) + offset
 }
 
 func autocorrelationFFT(buffer []float64, fftSize int) []float64 {
@@ -112,4 +140,58 @@ func autocorrelationFFT(buffer []float64, fftSize int) []float64 {
 	copy(autocorr, autocorrFull[:n])
 
 	return autocorr
+}
+
+// DetectPitch detects pitch using the McLeod Pitch Method (MPM).
+//
+// Algorithm steps:
+// 1. Calculate NSDF (Normalized Square Difference Function)
+// 2. Find positive peaks above threshold
+// 3. Select the highest peak (maximum clarity)
+// 4. Use parabolic interpolation for sub-sample accuracy
+// 5. Convert lag to frequency
+//
+// Parameters:
+//   - buffer: Audio signal buffer
+//   - sampleRate: Sample rate in Hz
+//   - threshold: Detection threshold (0 to 1), default 0.1
+//     Higher = more conservative (fewer false positives)
+//     Lower = more sensitive (may detect noise)
+//
+// Returns:
+//   - PitchResult containing frequency, clarity, and whether pitch was detected
+func DetectPitch(buffer []float64, sampleRate int, threshold float64) PitchResult {
+	// Step 1: Calculate NSDF
+	nsdf := NormalizedSquareDifference(buffer)
+
+	// Step 2: Find peaks above threshold
+	peaks := peakPicking(nsdf, threshold)
+
+	if len(peaks) == 0 {
+		return PitchResult{Frequency: 0, Clarity: 0, HasPitch: false}
+	}
+
+	// Step 3: Select the highest peak (maximum clarity)
+	bestPeak := peaks[0]
+	for _, p := range peaks[1:] {
+		if p.value > bestPeak.value {
+			bestPeak = p
+		}
+	}
+
+	// Step 4: Refine peak location with parabolic interpolation
+	refinedLag := parabolicInterpolation(nsdf, bestPeak.index)
+
+	// Step 5: Convert lag to frequency
+	if refinedLag <= 0 {
+		return PitchResult{Frequency: 0, Clarity: 0, HasPitch: false}
+	}
+
+	frequency := float64(sampleRate) / refinedLag
+
+	return PitchResult{
+		Frequency: frequency,
+		Clarity:   bestPeak.value,
+		HasPitch:  true,
+	}
 }
