@@ -54,6 +54,34 @@ func NormalizedSquareDifference(buffer []float64) []float64 {
 	return nsdf
 }
 
+// Peak represents a detected peak in the NSDF.
+type Peak struct {
+	Index int     // Lag index (tau)
+	Value float64 // NSDF value at this lag
+}
+
+// PeakPicking finds positive peaks in the NSDF that exceed the threshold.
+// A peak is defined as a point where:
+// 1. The value is positive
+// 2. The value exceeds the threshold
+// 3. The value is greater than its neighbors (local maximum)
+func PeakPicking(nsdf []float64, threshold float64) []Peak {
+	var peaks []Peak
+
+	// Start from lag=1 to avoid the trivial peak at lag=0
+	for i := 1; i < len(nsdf)-1; i++ {
+		// Check if it's a positive peak above threshold
+		if nsdf[i] > threshold && nsdf[i] > 0 {
+			// Check if it's a local maximum
+			if nsdf[i] > nsdf[i-1] && nsdf[i] > nsdf[i+1] {
+				peaks = append(peaks, Peak{Index: i, Value: nsdf[i]})
+			}
+		}
+	}
+
+	return peaks
+}
+
 func autocorrelationFFT(buffer []float64, fftSize int) []float64 {
 	n := len(buffer)
 
