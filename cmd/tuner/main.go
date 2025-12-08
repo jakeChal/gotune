@@ -69,7 +69,7 @@ func tuningStatus(cents float64) string {
 	} else if cents < 0 {
 		return "  too low"
 	} else {
-		return "  too high"
+		return " too high"
 	}
 }
 
