@@ -27,6 +27,12 @@ var (
 	sharpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))  // Red (too high)
 	flatStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("12")) // Blue (too low)
 	noteStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14"))
+
+	// New styles
+	listeningStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Italic(true)
+	helpStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Faint(true)
+	containerStyle = lipgloss.NewStyle().Padding(1, 2)
+	perfectStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true) // Bright green
 )
 
 // current state
@@ -64,11 +70,17 @@ func renderHeader(profile config.InstrumentProfile) string {
 	headerStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		Padding(0, 1).
-		BorderForeground(lipgloss.Color("14"))
+		BorderForeground(lipgloss.Color("14")).
+		Align(lipgloss.Center)
 
-	text := fmt.Sprintf("%s Tuner", profile.Name)
+	text := fmt.Sprintf("%s Tuner\n%.0f - %.0f Hz",
+		profile.Name, profile.MinFreq, profile.MaxFreq)
 
 	return headerStyle.Render(text)
+}
+
+func renderFooter() string {
+	return helpStyle.Render("q: quit  •  ctrl+c: exit")
 }
 
 func (m model) Init() tea.Cmd {
@@ -76,17 +88,20 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) View() string {
-
 	header := renderHeader(m.profile)
+
 	var body string
 	if !m.hasPitch {
-		body = "♪ Listening for notes...\nPress 'q' to quit"
-
+		listening := listeningStyle.Render("♪ Listening for notes...")
+		body = lipgloss.Place(50, 1, lipgloss.Center, lipgloss.Center, listening)
 	} else {
-		body = formatTuningDisplay(m.frequency, m.noteName, m.cents) + "\n"
+		body = formatTuningDisplay(m.frequency, m.noteName, m.cents)
 	}
 
-	return header + "\n\n" + body + "\n"
+	footer := renderFooter()
+
+	content := lipgloss.JoinVertical(lipgloss.Left, header, "", body, "", footer)
+	return containerStyle.Render(content)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -129,6 +144,7 @@ func processAudio(ai *audio.AudioInput, audioChan chan pitchMsg, profile config.
 				result.Frequency >= profile.MinFreq &&
 				result.Frequency <= profile.MaxFreq {
 				noteName, _, centsOff := dsp.PitchToNote(result.Frequency)
+
 				newData := pitchMsg{
 					frequency: result.Frequency,
 					noteName:  noteName,
@@ -152,40 +168,65 @@ func formatTuningDisplay(freq float64, noteName string, cents float64) string {
 	formattedNote := fmt.Sprintf("%-4s", noteName)
 	styledNote := noteStyle.Render(formattedNote)
 
-	// Use fixed-width formatting with sign always shown for cents
-	// %+6.1f = sign + up to 2 digits + decimal + 1 digit = 6 chars total
-	// %7.1f = up to 4 digits + decimal + 1 digit = 7 chars total for frequency
-	return fmt.Sprintf("%s %s %s | %+6.1f¢ (%7.1f Hz)", styledNote, meter, status, cents, freq)
+	display := fmt.Sprintf("%s %s %s | %+6.1f¢ (%7.1f Hz)", styledNote, meter, status, cents, freq)
+
+	// Add celebration when perfectly in tune (within 1 cent)
+	absCents := cents
+	if absCents < 0 {
+		absCents = -absCents
+	}
+	if absCents <= 1.0 {
+		display = perfectStyle.Render("★ ") + display + perfectStyle.Render(" ★")
+	}
+
+	return display
 }
 
 func makeMeter(cents float64) string {
+	absCents := cents
+	if absCents < 0 {
+		absCents = -absCents
+	}
+
+	// Choose bracket color based on tuning state
+	var bracketStyle lipgloss.Style
+	if absCents <= 2 {
+		bracketStyle = inTuneStyle // Green brackets when in tune
+	} else if cents < 0 {
+		bracketStyle = flatStyle // Blue brackets when flat
+	} else {
+		bracketStyle = sharpStyle // Red brackets when sharp
+	}
+
+	leftBracket := bracketStyle.Render("[")
+	rightBracket := bracketStyle.Render("]")
+
 	// cents: -50 to +50 range
-	// Display: [<<<<|>>>>]
 	if cents < -20 {
-		return "[" + flatStyle.Render("<<<<") + pipeStyle.Render("|") + "    ]"
+		return leftBracket + flatStyle.Render("<<<<") + pipeStyle.Render("|") + "    " + rightBracket
 	}
 	if cents < -10 {
-		return "[ " + flatStyle.Render("<<<") + pipeStyle.Render("|") + "    ]"
+		return leftBracket + " " + flatStyle.Render("<<<") + pipeStyle.Render("|") + "    " + rightBracket
 	}
 	if cents < -5 {
-		return "[  " + flatStyle.Render("<<") + pipeStyle.Render("|") + "    ]"
+		return leftBracket + "  " + flatStyle.Render("<<") + pipeStyle.Render("|") + "    " + rightBracket
 	}
 	if cents < -2 {
-		return "[   " + flatStyle.Render("<") + pipeStyle.Render("|") + "    ]"
+		return leftBracket + "   " + flatStyle.Render("<") + pipeStyle.Render("|") + "    " + rightBracket
 	}
 	if cents <= 2 {
-		return "[    " + pipeStyle.Render("|") + "    ]" // Centered, in tune
+		return leftBracket + "    " + pipeStyle.Render("|") + "    " + rightBracket // Centered, in tune
 	}
 	if cents <= 5 {
-		return "[    " + pipeStyle.Render("|") + sharpStyle.Render(">") + "   ]"
+		return leftBracket + "    " + pipeStyle.Render("|") + sharpStyle.Render(">") + "   " + rightBracket
 	}
 	if cents <= 10 {
-		return "[    " + pipeStyle.Render("|") + sharpStyle.Render(">>") + "  ]"
+		return leftBracket + "    " + pipeStyle.Render("|") + sharpStyle.Render(">>") + "  " + rightBracket
 	}
 	if cents <= 20 {
-		return "[    " + pipeStyle.Render("|") + sharpStyle.Render(">>>") + " ]"
+		return leftBracket + "    " + pipeStyle.Render("|") + sharpStyle.Render(">>>") + " " + rightBracket
 	}
-	return "[    " + pipeStyle.Render("|") + sharpStyle.Render(">>>>") + "]"
+	return leftBracket + "    " + pipeStyle.Render("|") + sharpStyle.Render(">>>>") + rightBracket
 }
 
 func tuningStatus(cents float64) string {
