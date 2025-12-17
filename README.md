@@ -8,8 +8,7 @@ Minimal, fast CLI tuner for string instruments (currently guitar & [bouzouki](ht
 
 ## 🎬 Demo
 
-[![asciicast](https://asciinema.org/a/eFEGQnQV4m2HP50wJSpwlxDUS.svg)](https://asciinema.org/a/eFEGQnQV4m2HP50wJSpwlxDUS)
-
+![Made with VHS](https://vhs.charm.sh/vhs-4bNFycRRlczq1ytF6Vhf5S.gif)
 ---
 
 ---
