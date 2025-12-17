@@ -4,14 +4,12 @@
 
 Minimal, fast CLI tuner for string instruments (currently guitar & [bouzouki](https://en.wikipedia.org/wiki/Bouzouki)), written in Go.
 
----
 
 ## 🎬 Demo
 
 ![Made with VHS](https://vhs.charm.sh/vhs-4bNFycRRlczq1ytF6Vhf5S.gif)
----
 
----
+
 
 ## 🚀 Quick Start
 
@@ -30,7 +28,7 @@ go build -o gotune cmd/tuner
     ./gotune -i bouzouki
     ```
 
----
+
 
 ## 🧪 Running Tests
 
@@ -52,7 +50,6 @@ pip install -r requirements.txt
 python test_mpm.py
 ```
 
----
 
 ## 📖 Reference Implementation
 
@@ -62,14 +59,20 @@ The `python/` directory contains a pure Python implementation of the McLeod Pitc
 **Reference:**
 - McLeod, P., & Wyvill, G. (2005). [A Smarter Way to Find Pitch](https://www.cs.otago.ac.nz/graphics/Geoff/tartini/papers/A_Smarter_Way_to_Find_Pitch.pdf)
 
----
+
 
 ## 🛣️ Roadmap
 
-- Support more instruments
-- Add UI
-- Setup CI
+- Android support
+- Web app
 - Add benchmarks
+- Support more instruments?
 
----
 
+## 🛞 Under the hood
+
+`gotune` uses:
+
+- [bubbletea](https://github.com/charmbracelet/bubbletea) for the TUI
+- [lipgloss](https://github.com/charmbracelet/lipgloss) for the styling
+- [vhs](https://github.com/charmbracelet/vhs) for generating the GIF
