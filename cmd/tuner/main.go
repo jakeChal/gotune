@@ -21,6 +21,7 @@ const (
 )
 
 var (
+	pipeStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))  // Gray
 	inTuneStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // Green
 	closeStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("11")) // Yellow
 	sharpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))  // Red (too high)
@@ -33,7 +34,6 @@ type model struct {
 	frequency float64
 	noteName  string
 	cents     float64
-	// clarity   float64
 	hasPitch  bool
 	profile   config.InstrumentProfile
 	audioChan chan pitchMsg
@@ -60,15 +60,33 @@ func initialModel(profile config.InstrumentProfile, audioChan chan pitchMsg) mod
 	}
 }
 
+func renderHeader(profile config.InstrumentProfile) string {
+	headerStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		Padding(0, 1).
+		BorderForeground(lipgloss.Color("14"))
+
+	text := fmt.Sprintf("%s Tuner", profile.Name)
+
+	return headerStyle.Render(text)
+}
+
 func (m model) Init() tea.Cmd {
 	return listenForAudio(m.audioChan)
 }
 
 func (m model) View() string {
+
+	header := renderHeader(m.profile)
+	var body string
 	if !m.hasPitch {
-		return "Listening ...\n"
+		body = "♪ Listening for notes...\nPress 'q' to quit"
+
+	} else {
+		body = formatTuningDisplay(m.frequency, m.noteName, m.cents) + "\n"
 	}
-	return formatTuningDisplay(m.frequency, m.noteName, m.cents) + "\n"
+
+	return header + "\n\n" + body + "\n"
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -99,8 +117,6 @@ func processAudio(ai *audio.AudioInput, audioChan chan pitchMsg, profile config.
 		if len(bufferAccum) >= bufferSize {
 			energy := dsp.CalculateRMS(bufferAccum[:bufferSize])
 			if energy < silenceThreshold {
-				// fmt.Printf("\rListening...%-60s", "")
-				// Keep overflow samples for better continuity
 				bufferAccum = bufferAccum[bufferSize:]
 				continue
 			}
@@ -113,7 +129,6 @@ func processAudio(ai *audio.AudioInput, audioChan chan pitchMsg, profile config.
 				result.Frequency >= profile.MinFreq &&
 				result.Frequency <= profile.MaxFreq {
 				noteName, _, centsOff := dsp.PitchToNote(result.Frequency)
-				// fmt.Print(formatTuningDisplay(result.Frequency, noteName, centsOff))
 				newData := pitchMsg{
 					frequency: result.Frequency,
 					noteName:  noteName,
@@ -130,41 +145,47 @@ func processAudio(ai *audio.AudioInput, audioChan chan pitchMsg, profile config.
 }
 
 func formatTuningDisplay(freq float64, noteName string, cents float64) string {
-	// Visual meter: [<<<|>>>] where | is perfect
 	meter := makeMeter(cents)
 	status := tuningStatus(cents)
-	styledNote := noteStyle.Render(noteName)
-	return fmt.Sprintf("%-4s %s %s | %7.2f Hz", styledNote, meter, status, freq)
+
+	// Format the note name width FIRST, then style it
+	formattedNote := fmt.Sprintf("%-4s", noteName)
+	styledNote := noteStyle.Render(formattedNote)
+
+	// Use fixed-width formatting with sign always shown for cents
+	// %+6.1f = sign + up to 2 digits + decimal + 1 digit = 6 chars total
+	// %7.1f = up to 4 digits + decimal + 1 digit = 7 chars total for frequency
+	return fmt.Sprintf("%s %s %s | %+6.1f¢ (%7.1f Hz)", styledNote, meter, status, cents, freq)
 }
 
 func makeMeter(cents float64) string {
 	// cents: -50 to +50 range
 	// Display: [<<<<|>>>>]
 	if cents < -20 {
-		return "[<<<<|    ]"
+		return "[" + flatStyle.Render("<<<<") + pipeStyle.Render("|") + "    ]"
 	}
 	if cents < -10 {
-		return "[ <<<|    ]"
+		return "[ " + flatStyle.Render("<<<") + pipeStyle.Render("|") + "    ]"
 	}
 	if cents < -5 {
-		return "[  <<|    ]"
+		return "[  " + flatStyle.Render("<<") + pipeStyle.Render("|") + "    ]"
 	}
 	if cents < -2 {
-		return "[   <|    ]"
+		return "[   " + flatStyle.Render("<") + pipeStyle.Render("|") + "    ]"
 	}
 	if cents <= 2 {
-		return "[    |    ]" // In tune!
+		return "[    " + pipeStyle.Render("|") + "    ]" // Centered, in tune
 	}
 	if cents <= 5 {
-		return "[    |>   ]"
+		return "[    " + pipeStyle.Render("|") + sharpStyle.Render(">") + "   ]"
 	}
 	if cents <= 10 {
-		return "[    |>>  ]"
+		return "[    " + pipeStyle.Render("|") + sharpStyle.Render(">>") + "  ]"
 	}
 	if cents <= 20 {
-		return "[    |>>> ]"
+		return "[    " + pipeStyle.Render("|") + sharpStyle.Render(">>>") + " ]"
 	}
-	return "[    |>>>>]"
+	return "[    " + pipeStyle.Render("|") + sharpStyle.Render(">>>>") + "]"
 }
 
 func tuningStatus(cents float64) string {
@@ -174,15 +195,15 @@ func tuningStatus(cents float64) string {
 	}
 
 	if absCents <= 2 {
-		return inTuneStyle.Render("✓ IN TUNE")
+		return inTuneStyle.Render("✓ IN TUNE ")
 	} else if absCents <= 5 {
-		return closeStyle.Render("~ close")
+		return closeStyle.Render(" ~ close  ")
 	} else if absCents <= 10 {
-		return closeStyle.Render("  adjust")
+		return closeStyle.Render("  adjust  ")
 	} else if cents < 0 {
-		return flatStyle.Render("  too low")
+		return flatStyle.Render("  too low ")
 	} else {
-		return sharpStyle.Render(" too high")
+		return sharpStyle.Render(" too high ")
 	}
 }
 
@@ -213,9 +234,6 @@ func main() {
 	model := initialModel(profile, audioChan)
 
 	p := tea.NewProgram(model)
-
-	// fmt.Printf("Tuning for: %s (%.0f-%.0f Hz)\n",
-	// 	profile.Name, profile.MinFreq, profile.MaxFreq)
 
 	// if *threshold < 0 || *threshold > 1.0 {
 	// 	fmt.Fprintf(os.Stderr, "threshold: %v is out of range!\n", *threshold)
