@@ -73,6 +73,7 @@ The `python/` directory contains a pure Python implementation of the McLeod Pitc
 
 `gotune` uses:
 
+- [malgo](https://github.com/gen2brain/malgo/) for the audio captures
 - [bubbletea](https://github.com/charmbracelet/bubbletea) for the TUI
 - [lipgloss](https://github.com/charmbracelet/lipgloss) for the styling
 - [vhs](https://github.com/charmbracelet/vhs) for generating the GIF
