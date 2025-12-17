@@ -10,6 +10,7 @@ import (
 	"github.com/jakeChal/gotune/pkg/dsp"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -17,6 +18,14 @@ const (
 	bufferSize        = 4096
 	silenceThreshold  = 0.001
 	minDisplayClarity = 0.3
+)
+
+var (
+	inTuneStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // Green
+	closeStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("11")) // Yellow
+	sharpStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))  // Red (too high)
+	flatStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("12")) // Blue (too low)
+	noteStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14"))
 )
 
 // current state
@@ -124,7 +133,8 @@ func formatTuningDisplay(freq float64, noteName string, cents float64) string {
 	// Visual meter: [<<<|>>>] where | is perfect
 	meter := makeMeter(cents)
 	status := tuningStatus(cents)
-	return fmt.Sprintf("\r%-4s %s %s | %7.2f Hz", noteName, meter, status, freq)
+	styledNote := noteStyle.Render(noteName)
+	return fmt.Sprintf("%-4s %s %s | %7.2f Hz", styledNote, meter, status, freq)
 }
 
 func makeMeter(cents float64) string {
@@ -164,15 +174,15 @@ func tuningStatus(cents float64) string {
 	}
 
 	if absCents <= 2 {
-		return "✓ IN TUNE"
+		return inTuneStyle.Render("✓ IN TUNE")
 	} else if absCents <= 5 {
-		return "~ close  "
+		return closeStyle.Render("~ close")
 	} else if absCents <= 10 {
-		return "  adjust "
+		return closeStyle.Render("  adjust")
 	} else if cents < 0 {
-		return "  too low"
+		return flatStyle.Render("  too low")
 	} else {
-		return " too high"
+		return sharpStyle.Render(" too high")
 	}
 }
 
